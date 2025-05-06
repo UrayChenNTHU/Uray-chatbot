@@ -143,8 +143,8 @@ def main():
                     st_c_chat.chat_message(msg["role"]).markdown((msg["content"]))
 
 
-    story_template = ("Give me a story started from '##PROMPT##'."
-                      f"And remeber to mention user's name {user_name} in the end. Add some emoji in the end of each sentence."
+    story_template = ("Please give appropriate response according to the content of ##PROMPT##."
+                      f"And remeber to mention user's name {user_name} in the end. Don't add some emoji in the end of each sentence."
                       f"Please express in {lang_setting}")
 
     classification_template = ("You are a classification agent, your job is to classify what ##PROMPT## is according to the job definition list in <JOB_DEFINITION>"
@@ -201,7 +201,7 @@ def main():
         
     
     if prompt := st.chat_input(placeholder=placeholderstr, key="chat_bot"):
-        chat(prompt)
+        #chat(prompt)
 
         recs = recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5)
         st.markdown("### 🎯 我猜你可能有興趣的文章／遊戲")
@@ -209,6 +209,22 @@ def main():
             recs[["title","url","score"]]
               .assign(score=lambda df: df["score"].map(lambda x: f"{x:.3f}"))
         )
+        top2 = recs.head(2)
+        context = ""
+        for _, row in top2.iterrows():
+            snippet = row["content"][:300].replace("\n"," ")
+            context += f"文章標題：{row['title']}\n摘要：{snippet} …\n\n"
+
+        # 4. 讓 LLM 根據這些內容做簡短介紹
+        summary_prompt = (
+            "以下是兩篇遊戲心得文章的標題與內容摘要，"
+            "請分別用 2‑3 句話，介紹這兩款遊戲的主要特色與玩法：\n\n"
+            f"{context}"
+        )
+        intro = generate_response(summary_prompt)
+
+        st.markdown("### 📖 推薦遊戲簡介")
+        st.write(intro)
 
 if __name__ == "__main__":
     main()
