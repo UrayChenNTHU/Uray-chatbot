@@ -6,17 +6,9 @@ import os
 import subprocess
 import sys
 import udn_data_processing
-try:
-    from sklearn.metrics.pairwise import cosine_similarity
-except ModuleNotFoundError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "scikit-learn"])
-    from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity
 
-try:
-    import jieba
-except ModuleNotFoundError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "jieba"])
-    import jieba
+import jieba
 
 # Import ConversableAgent class
 import autogen

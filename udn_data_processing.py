@@ -8,12 +8,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-
-try:
-    from sklearn.feature_extraction.text import TfidfVectorizer
-except ModuleNotFoundError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "scikit-learn"])
-    from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 

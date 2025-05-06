@@ -4,3 +4,5 @@ autogen-agentchat
 autogen-ext[openai]
 ag2[gemini]
 ag2[openai]
+jieba
+scikit-learn
