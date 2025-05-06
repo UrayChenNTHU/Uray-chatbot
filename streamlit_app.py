@@ -3,6 +3,20 @@ import time
 import re
 from dotenv import load_dotenv
 import os
+import subprocess
+import sys
+import udn_data_processing
+try:
+    from sklearn.metrics.pairwise import cosine_similarity
+except ModuleNotFoundError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "scikit-learn"])
+    from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    import jieba
+except ModuleNotFoundError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "jieba"])
+    import jieba
 
 # Import ConversableAgent class
 import autogen
@@ -12,6 +26,10 @@ from autogen.code_utils import content_str
 from coding.constant import JOB_DEFINITION, RESPONSE_FORMAT
 
 import streamlit as st
+@st.cache_data(show_spinner=False)
+def load_data():
+    return udn_data_processing.load_and_tfidf()
+
 
 # Load environment variables from .env file
 load_dotenv(override=True)
@@ -26,6 +44,16 @@ user_name = "Uray"
 user_image = "https://www.w3schools.com/howto/img_avatar.png"
 
 seed = 42
+
+def recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5):
+    tokens = jieba.lcut(prompt)
+    joined = " ".join(tokens)
+    vec = vectorizer.transform([joined])
+    sims = cosine_similarity(vec, tfidf_matrix).flatten()
+    idxs = sims.argsort()[::-1][:top_n]
+    recs = df.iloc[idxs].copy()
+    recs["score"] = sims[idxs]
+    return recs
 
 llm_config_gemini = LLMConfig(
     api_type = "google", 
@@ -84,6 +112,7 @@ def main():
         page_icon="img/favicon.ico"
     )
 
+    df, vectorizer, tfidf_matrix = load_data()
     # Show title and description.
     st.title(f"💬 {user_name}'s Chatbot")
 
@@ -181,6 +210,13 @@ def main():
     
     if prompt := st.chat_input(placeholder=placeholderstr, key="chat_bot"):
         chat(prompt)
+
+        recs = recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5)
+        st.markdown("### 🎯 我猜你可能有興趣的文章／遊戲")
+        st.table(
+            recs[["title","url","score"]]
+              .assign(score=lambda df: df["score"].map(lambda x: f"{x:.3f}"))
+        )
 
 if __name__ == "__main__":
     main()

@@ -8,6 +8,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
+
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
 except ModuleNotFoundError:
@@ -55,10 +56,10 @@ def load_and_tfidf():
         tfidf_dicts = list(exe.map(get_tfidf_dict_sparse, range(tfidf_matrix.shape[0])))
 
     data["tfidf"] = tfidf_dicts
-    return data
+    return data, vectorizer, tfidf_matrix
 
 
 
 if __name__=="__main__":
-    data = load_and_tfidf()
+    data, _ = load_and_tfidf()
     print(data.head())
