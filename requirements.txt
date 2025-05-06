@@ -1,5 +1,6 @@
 streamlit
 openai
+google-genai
 autogen-agentchat
 autogen-ext[openai]
 ag2[gemini]

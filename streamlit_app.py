@@ -7,7 +7,10 @@ import subprocess
 import sys
 import udn_data_processing
 from sklearn.metrics.pairwise import cosine_similarity
-
+import json
+from google import genai
+from google.genai import types
+import re
 import jieba
 
 # Import ConversableAgent class
@@ -63,8 +66,9 @@ with llm_config_gemini:
     assistant = AssistantAgent(
         name="assistant",
         system_message=(
-        "You are a helpful storyteller assistant. "
-        "Please give me a story. After your result, say 'ALL DONE'. "
+        "You are a helpful assistant. "
+        "Answer user questions appropriately. "
+        "After your result, say 'ALL DONE'. "
         "Do not say 'ALL DONE' in the same response."
         ),
         max_consecutive_auto_reply=2
@@ -188,43 +192,77 @@ def main():
                         st_c_chat.chat_message("user",avatar=user_image).write(content)
     
         return 
+    
+    def wants_recommendation(prompt: str) -> bool:
+        # 将 few‑shot 示例放到 system_instruction
+        sys_instruction = """
+    You are an intent classifier. Decide whether the user is asking for game recommendations.
+    Respond in JSON ONLY, with a boolean field "recommend".
+    Some Examples:
+    Input: "我想找一些好玩的遊戲"
+    Output: {"recommend": true}
+    Input: "今天天氣怎麼樣？"
+    Output: {"recommend": false}
+    Input: "幫我推薦 RPG 類型的遊戲"
+    Output: {"recommend": true}
+    Input: "你喜歡什麼顏色？"
+    Output: {"recommend": false}
+    Now classify the final input.  (Do NOT output anything else.)
+    """
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        resp = gemini_client.models.generate_content(
+            model="gemini-2.0-flash-lite",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=sys_instruction,
+                max_output_tokens=50
+            )
+        )
 
-    # Chat function section (timing included inside function)
+        text = resp.text.strip()
+        match = re.search(r'\{.*\}', text)
+        if match:
+            try:
+                j = json.loads(match.group())
+                return bool(j.get("recommend", False))
+            except json.JSONDecodeError:
+                pass
+        return False
+    
     def chat(prompt: str):
         st_c_chat.chat_message("user",avatar=user_image).write(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
+        if wants_recommendation(prompt):
+            recs = recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5)
+            st.markdown("### 🎯 我猜你可能有興趣的文章／遊戲")
+            st.table(
+                recs[["title","url","score"]]
+                .assign(score=lambda df: df["score"].map(lambda x: f"{x:.3f}"))
+            )
+            top2 = recs.head(2)
+            context = ""
+            for _, row in top2.iterrows():
+                snippet = row["content"][:300].replace("\n"," ")
+                context += f"文章標題：{row['title']}\n摘要：{snippet} …\n\n"
 
-        response = generate_response(prompt)
+            # 4. 讓 LLM 根據這些內容做簡短介紹
+            summary_prompt = (
+                "以下是兩篇遊戲心得文章的標題與內容摘要，"
+                "請分別用 2‑3 句話，介紹這兩款遊戲的主要特色與玩法：\n\n"
+                f"{context}"
+            )
+            intro = generate_response(summary_prompt)
 
-        st_c_chat.chat_message("assistant").write(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            st.markdown("### 📖 推薦遊戲簡介")
+            st.write(intro)
+        else:
+            reply = generate_response(prompt)
+            st_c_chat.chat_message("assistant").write(reply)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
         
     
     if prompt := st.chat_input(placeholder=placeholderstr, key="chat_bot"):
-        #chat(prompt)
-
-        recs = recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5)
-        st.markdown("### 🎯 我猜你可能有興趣的文章／遊戲")
-        st.table(
-            recs[["title","url","score"]]
-              .assign(score=lambda df: df["score"].map(lambda x: f"{x:.3f}"))
-        )
-        top2 = recs.head(2)
-        context = ""
-        for _, row in top2.iterrows():
-            snippet = row["content"][:300].replace("\n"," ")
-            context += f"文章標題：{row['title']}\n摘要：{snippet} …\n\n"
-
-        # 4. 讓 LLM 根據這些內容做簡短介紹
-        summary_prompt = (
-            "以下是兩篇遊戲心得文章的標題與內容摘要，"
-            "請分別用 2‑3 句話，介紹這兩款遊戲的主要特色與玩法：\n\n"
-            f"{context}"
-        )
-        intro = generate_response(summary_prompt)
-
-        st.markdown("### 📖 推薦遊戲簡介")
-        st.write(intro)
+        chat(prompt)
 
 if __name__ == "__main__":
     main()
