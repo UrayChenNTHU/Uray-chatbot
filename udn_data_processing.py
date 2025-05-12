@@ -2,15 +2,29 @@ import requests
 import zipfile
 import io
 import os
+import wget
 import pandas as pd
 import ast
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import jieba
+from sklearn.metrics.pairwise import cosine_similarity
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+FONT_URL = "https://drive.google.com/uc?id=1eGAsTN1HBpJAkeVM57_C7ccp7hbgSz3_&export=download"
+FONT_FILE = "TaipeiSansTCBeta-Regular.ttf"
 
+def ensure_font(font_url: str = FONT_URL, font_path: str = FONT_FILE):
+    if not os.path.isfile(font_path):
+        print(f"Downloading font to {font_path}…")
+        wget.download(font_url, font_path)
+        print(" ✅ Font downloaded.")
+    else:
+        print("Font already exists, skip download.")
 
 # 下載 zip 檔
 def load_and_tfidf():
@@ -52,6 +66,48 @@ def load_and_tfidf():
 
     data["tfidf"] = tfidf_dicts
     return data, vectorizer, tfidf_matrix
+
+def draw_wordcloud(data: pd.DataFrame,  vectorizer: TfidfVectorizer ,
+                   tfidf_matrix,  query: str = "all", top_n: int = 20):
+    print('詞雲製作')
+    if query== 'all':
+        freq_dict  = {}
+        for doc in data["tfidf"]:
+            freq_dict .update(doc)
+        title = "整體資料庫詞雲"
+    else:
+        tokens = jieba.lcut(query)
+        joined = " ".join(tokens)
+        q_vec = vectorizer.transform([joined])
+
+        sims = cosine_similarity(q_vec, tfidf_matrix).flatten()
+        idxs = sims.argsort()[::-1][:top_n]
+        freq_dict = {}
+        for i in idxs:
+            freq_dict.update(data.loc[i, "tfidf"])
+        title = f"最相關的前 {top_n} 篇文章詞雲"
+    
+    print('詞雲產生中...')
+    wc = WordCloud(
+      width=3000,
+      height=3000,
+      background_color='white',               #   Background Color
+      max_words=100,                    #   Max words
+  #    mask=back_image,                       #   Background Image
+      #max_font_size=None,                   #   Font size
+      font_path="TaipeiSansTCBeta-Regular.ttf",
+      random_state=50,                    #   Random color
+      regexp=r"\w+(?:[-']\w+)*",  # Update the regexp parameter to include hyphens, you can mark out this line to hide the space character.
+      contour_width=1,  # adjust the contour width
+      contour_color='black',  # adjust the contour color
+      prefer_horizontal=0.9)
+    wc.generate_from_frequencies(freq_dict)
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+    print('詞雲產生完成')
+    return fig
+
 
 
 

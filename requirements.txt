@@ -7,3 +7,5 @@ ag2[gemini]
 ag2[openai]
 jieba
 scikit-learn
+wget
+wordcloud
