@@ -9,3 +9,4 @@ jieba
 scikit-learn
 wget
 wordcloud
+tabulate
