@@ -382,26 +382,25 @@ def main():
                 "content": markdown_str
             })
 
+    def on_submit_recommend():
+        user_qry = st.session_state.get("recommend_query", "").strip()
+        if user_qry:
+            run_recommend_flow(user_qry)
+        else:
+            st.warning("請先輸入想要搜尋的關鍵字／描述")
+
 
     ctrl_container = st.container()
     with ctrl_container:
         if not st.session_state.recommend_triggered:
-            st.button("🔍請推薦遊戲給我(尚未更新完成)", on_click=trigger_recommend)
+            st.button("🔍請推薦遊戲給我", on_click=trigger_recommend)
         else:
-                # 按過按鈕之後，就要顯示提示文字與輸入框
                 st.markdown(
                     "沒問題！請輸入你想知道的主題元素，可以是字詞也可以是一段描述，"
                     "如果描述得越清楚，我越能更準確地推薦你想要的遊戲哦！"
                 )
-                # 這裡使用一個新的 key: "recommend_query"，存放使用者輸入
-                user_qry = st.text_input(
-                    "", key="recommend_query", placeholder="請在此輸入推薦關鍵字")
-                # 當使用者點「提交推薦」後，就呼叫 run_recommend_flow()
-                if st.button("提交推薦"):
-                    if user_qry.strip():
-                        run_recommend_flow(user_qry.strip())
-                    else:
-                        st.warning("請先輸入想要搜尋的關鍵字／描述")
+                user_qry = st.text_input("", key="recommend_query", placeholder="請在此輸入推薦關鍵字")
+                st.button("提交推薦", on_click=on_submit_recommend)
             
 
         if st.session_state.wc_stage == 0:
