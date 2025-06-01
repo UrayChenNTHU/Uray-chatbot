@@ -345,40 +345,47 @@ def main():
 
     def trigger_recommend():
             st.session_state.recommend_triggered = True
+    
+    def reset_recommend():
+        st.session_state.recommend_triggered = False
+        st.session_state.recommend_query = ""
 
     def run_recommend_flow(user_input):
             """
             這段負責呼叫既有的 recommend_games() + generate_response()，顯示結果。
             """
+            st.session_state.recommend_triggered = False
+            st.session_state.pop("recommend_query", None)
             recs = recommend_games(user_input, df, vectorizer, tfidf_matrix, top_n=5)
-            st.markdown("### 🎯 我猜你可能有興趣的文章／遊戲")
-            st.table(
-                recs[["title", "url", "score"]]
-                .assign(score=lambda df: df["score"].map(lambda x: f"{x:.3f}"))
-            )
-
-            # 組 context 讓 LLM 幫你做簡短介紹
+            df_for_md = recs[["title", "url", "score"]].copy()
+            df_for_md["score"] = df_for_md["score"].map(lambda x: f"{x:.3f}")
+            df_for_md["title"] = df_for_md.apply(lambda row: f"[{row['title']}]({row['url']})", axis=1)
+            md_table = df_for_md.to_markdown(index=False)
             context = ""
             for _, row in recs.iterrows():
                 snippet = row["content"][:300].replace("\n", " ")
                 context += f"文章標題：{row['title']}\n摘要：{snippet} …\n\n"
-
             summary_prompt = (
                 "以下是兩篇遊戲心得文章的標題與內容摘要，"
                 "請分別用 2-3 句話，介紹這兩款遊戲的主要特色與玩法：\n\n"
                 f"{context}"
             )
             intro = generate_response(summary_prompt)
-
-            st.markdown("### 📖 推薦遊戲簡介")
-            st.write(intro)
-            st.session_state.recommend_triggered = False
-            st.session_state.recommend_query = ""
+            markdown_str = (
+                "### 🎯 我猜你可能有興趣的文章／遊戲\n\n"
+                f"{md_table}\n\n" 
+                "### 📖 推薦遊戲簡介\n\n"
+                f"{intro}"
+            )
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": markdown_str
+            })
 
 
     ctrl_container = st.container()
     with ctrl_container:
-        if st.session_state.recommend_triggered == False:
+        if not st.session_state.recommend_triggered:
             st.button("🔍請推薦遊戲給我(尚未更新完成)", on_click=trigger_recommend)
         else:
                 # 按過按鈕之後，就要顯示提示文字與輸入框
@@ -388,9 +395,7 @@ def main():
                 )
                 # 這裡使用一個新的 key: "recommend_query"，存放使用者輸入
                 user_qry = st.text_input(
-                    "", key="recommend_query", placeholder="請在此輸入推薦關鍵字", 
-                    on_change=None
-                )
+                    "", key="recommend_query", placeholder="請在此輸入推薦關鍵字")
                 # 當使用者點「提交推薦」後，就呼叫 run_recommend_flow()
                 if st.button("提交推薦"):
                     if user_qry.strip():
