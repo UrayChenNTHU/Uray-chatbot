@@ -400,7 +400,7 @@ def main():
                     "如果描述得越清楚，我越能更準確地推薦你想要的遊戲哦！"
                 )
                 user_qry = st.text_input("", key="recommend_query", placeholder="請在此輸入推薦關鍵字")
-                st.button("提交推薦", on_click=on_submit_recommend)
+                st.button("提交", on_click=on_submit_recommend)
             
 
         if st.session_state.wc_stage == 0:
