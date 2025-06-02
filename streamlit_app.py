@@ -39,6 +39,7 @@ load_dotenv(override=True)
 # URL configurations
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 OPEN_API_KEY = st.secrets["OPEN_API_KEY"]
+DEEPSEEK_API_KEY = st.secrets["Deepseek_KEY"]
 
 placeholderstr = "Please input your command"
 user_name = "User"
@@ -46,14 +47,45 @@ user_image = "https://www.w3schools.com/howto/img_avatar.png"
 
 seed = 42
 
-def recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5):
-    tokens = jieba.lcut(prompt)
-    joined = " ".join(tokens)
-    vec = vectorizer.transform([joined])
-    sims = cosine_similarity(vec, tfidf_matrix).flatten()
+def recommend_games(prompt: str, df: pd.DataFrame, vectorizer, tfidf_matrix, top_n: int = 5):
+    """
+    總入口：先請 LLM 拆解「喜歡」跟「不喜歡」，
+    再把拆出來的片段各自做 TF-IDF，最後合併向量算相似度。
+    """
+    # 1. 用 LLM 拆成 like/dislike
+    prefs = split_preferences_by_llm(prompt)
+    positive_text = prefs.get("like", "").strip()
+    negative_text = prefs.get("dislike", "").strip()
+
+    # 2. 定義把文字轉成向量的 helper
+    def text_to_vec(text: str):
+        tokens = jieba.lcut(text)
+        joined = " ".join(tokens)
+        return vectorizer.transform([joined])
+
+    # 3. 如果 positive 也空，就直接 fallback 成原本舊版（全部當成一段正面）
+    if not positive_text:
+        positive_text = prompt
+
+    pos_vec = text_to_vec(positive_text)
+    neg_vec = None
+    if negative_text:
+        neg_vec = text_to_vec(negative_text)
+
+    # 4. 合併向量：pos - neg
+    if neg_vec is not None:
+        combined_vec = pos_vec - neg_vec
+    else:
+        combined_vec = pos_vec
+
+    # 5. 用合成向量跟整個 tfidf_matrix 算 cosine similarity
+    sims = cosine_similarity(combined_vec, tfidf_matrix).flatten()
+
+    # 6. 挑 top_n
     idxs = sims.argsort()[::-1][:top_n]
     recs = df.iloc[idxs].copy()
     recs["score"] = sims[idxs]
+
     return recs
 
 llm_config_gemini = LLMConfig(
@@ -91,6 +123,7 @@ with llm_config_openai:
         )
     )
 
+
 # 3. Helper to refine tokens via LLM
 def refine_by_llm(token_list):
     prompt = f"Refine the following token list: {token_list}"
@@ -108,6 +141,46 @@ def refine_tokens_list(token_list):
         return token_list
     
     return refine_by_llm(token_list)
+
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+def split_preferences_by_llm(user_input: str) -> dict:
+    """
+    用 Google Gemini 把一句含「喜歡」和「不喜歡」的中文拆成 JSON：
+      { "like": "...", "dislike": "..." }
+    如果 Gemini 回傳非 JSON，就 fallback 只給 like，把 dislike 設空。
+    """
+    system_instruction = (
+        "你是一個中文語意分析專家，"
+        "能把一段包含「喜歡」跟「不喜歡」的句子拆成兩個欄位："
+        "'like' 跟 'dislike'，以 JSON 回傳。"
+        "請僅回傳純 JSON，千萬不要多加任何解釋文字。\n"
+        "如果句子裡沒有「不喜歡」的部分，就把 dislike 設為空字串。"
+        "中文說明請使用繁體中文。"
+    )
+    user_message = f"請把這段拆成 JSON：\"{user_input}\""
+
+    # 2. 呼叫 Gemini
+    resp = gemini_client.models.generate_content(
+        model="gemini-2.0-flash-lite",  # 或你有權限的其他 Gemini 型號
+        contents=user_message,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.0,
+            max_output_tokens=200
+        )
+    )
+
+    text = resp.text.strip()
+    try:
+        # 嘗試 parse 回傳結果裡的 JSON
+        obj = json.loads(text)
+        like = obj.get("like", "").strip()
+        dislike = obj.get("dislike", "").strip()
+        return {"like": like, "dislike": dislike}
+    except Exception:
+        # parse 失敗就 fallback
+        return {"like": user_input, "dislike": ""}
+
 
 user_proxy = UserProxyAgent(
     "user_proxy",
