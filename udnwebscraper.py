@@ -83,10 +83,8 @@ def fetch_full_page(url: str, headless: bool = True, scroll_pause: float = 2.0) 
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument("--start-maximized")
-    options.binary_location = "/usr/bin/chromium"
     print('option')
-    service = Service("/usr/bin/chromedriver")
-    driver = Chrome(options=options, service=service)
+    driver = Chrome(options=options)
     print('driver done')
     driver.get(url)
 
