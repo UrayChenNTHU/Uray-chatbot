@@ -6,7 +6,6 @@ import os
 import subprocess
 import sys
 import udn_data_processing
-import udnwebscraper
 from sklearn.metrics.pairwise import cosine_similarity
 import json
 from google import genai
@@ -27,18 +26,9 @@ from coding.constant import JOB_DEFINITION, RESPONSE_FORMAT
 
 import streamlit as st
 
-@st.cache_data(show_spinner=True, ttl=86400)
-def run_udn_scraper_once() -> pd.DataFrame:
-    """
-    第一次呼叫時執行 udnwebscraper.run_all()，之後只要在 24 小時內再呼叫，
-    就會直接從快取拿結果；超過 24 小時，這個 function 才會再真正執行一次。
-    """
-    df = udnwebscraper.run_all()
-    return df
 
 @st.cache_data(show_spinner=False)
 def load_data():
-    run_udn_scraper_once()
     return udn_data_processing.load_and_tfidf()
 
 
