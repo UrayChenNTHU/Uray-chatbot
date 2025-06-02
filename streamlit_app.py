@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import udn_data_processing
+import udnwebscraper
 from sklearn.metrics.pairwise import cosine_similarity
 import json
 from google import genai
@@ -25,8 +26,19 @@ from autogen.code_utils import content_str
 from coding.constant import JOB_DEFINITION, RESPONSE_FORMAT
 
 import streamlit as st
+
+@st.cache_data(show_spinner=True, ttl=86400)
+def run_udn_scraper_once() -> pd.DataFrame:
+    """
+    第一次呼叫時執行 udnwebscraper.run_all()，之後只要在 24 小時內再呼叫，
+    就會直接從快取拿結果；超過 24 小時，這個 function 才會再真正執行一次。
+    """
+    df = udnwebscraper.run_all()
+    return df
+
 @st.cache_data(show_spinner=False)
 def load_data():
+    run_udn_scraper_once()
     return udn_data_processing.load_and_tfidf()
 
 
@@ -39,7 +51,7 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 OPEN_API_KEY = st.secrets["OPEN_API_KEY"]
 
 placeholderstr = "Please input your command"
-user_name = "Uray"
+user_name = "User"
 user_image = "https://www.w3schools.com/howto/img_avatar.png"
 
 seed = 42
@@ -257,7 +269,6 @@ def main():
             return 
         
         def wants_recommendation(prompt: str) -> bool:
-            # 将 few‑shot 示例放到 system_instruction
             sys_instruction = """
         You are an intent classifier. Decide whether the user is asking for game recommendations.
         As long as there are words related to the game and recommend(遊戲、推薦), it can be regarded as the user wants to be recommended

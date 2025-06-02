@@ -10,3 +10,7 @@ scikit-learn
 wget
 wordcloud
 tabulate
+beautifulsoup4
+selenium
+webdriver-manager
+python-dotenv
