@@ -62,7 +62,7 @@ def recommend_games(prompt: str, df: pd.DataFrame, vectorizer, tfidf_matrix, top
         tokens = jieba.lcut(text)
         joined = " ".join(tokens)
         return vectorizer.transform([joined])
-
+  
     # 3. 如果 positive 也空，就直接 fallback 成原本舊版（全部當成一段正面）
     if not positive_text:
         positive_text = prompt
