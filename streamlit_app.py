@@ -54,6 +54,7 @@ def recommend_games(prompt: str, df: pd.DataFrame, vectorizer, tfidf_matrix, top
     """
     # 1. 用 LLM 拆成 like/dislike
     prefs = split_preferences_by_llm(prompt)
+    print(prefs)
     positive_text = prefs.get("like", "").strip()
     negative_text = prefs.get("dislike", "").strip()
 
@@ -62,7 +63,7 @@ def recommend_games(prompt: str, df: pd.DataFrame, vectorizer, tfidf_matrix, top
         tokens = jieba.lcut(text)
         joined = " ".join(tokens)
         return vectorizer.transform([joined])
-        
+
     # 3. 如果 positive 也空，就直接 fallback 成原本舊版（全部當成一段正面）
     if not positive_text:
         positive_text = prompt
@@ -153,6 +154,9 @@ def split_preferences_by_llm(user_input: str) -> dict:
         "你是一個中文語意分析專家，"
         "能把一段包含「喜歡」跟「不喜歡」的句子拆成兩個欄位："
         "'like' 跟 'dislike'，以 JSON 回傳。"
+        '例如原句為「我喜歡可樂，但是不喜歡牛奶」則JSON為：{ "like": "可樂", "dislike": "牛奶" }' \
+        '「我不喜歡上學，也不喜歡玩耍」則JSON為：{ "like": "...", "dislike": "上學、玩耍" }' \
+        '「我喜歡看海，也喜歡爬山」則JSON為：{ "like": "看海、爬山", "dislike": "..." }'
         "請僅回傳純 JSON，千萬不要多加任何解釋文字。\n"
         "如果句子裡沒有「不喜歡」的部分，就把 dislike 設為空字串。"
         "中文說明請使用繁體中文。"
