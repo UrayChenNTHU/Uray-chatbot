@@ -47,7 +47,7 @@ user_image = "https://www.w3schools.com/howto/img_avatar.png"
 
 seed = 42
 
-'''
+"""
 llm_config_tokenizer = LLMConfig(
     api_type="openai",
     model="gpt-4o-mini",
@@ -92,7 +92,7 @@ def recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5):
     recs = df.iloc[idxs].copy()
     recs["score"] = sims[idxs]
     return recs
-'''
+"""
 
 def recommend_games(prompt: str, df: pd.DataFrame, vectorizer, tfidf_matrix, top_n: int = 5):
     """
