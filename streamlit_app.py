@@ -66,10 +66,10 @@ with llm_config_tokenizer:
     )
 
 def tokenize_by_llm(text: str) -> list:
-    """
+
     把 text 交給 LLM，要求它直接回傳 Python list 形式的 token list。
     若失敗就回傳空列表或原始文字做 fallback。
-    """
+
     prompt = f"請對以下文字做中文斷詞，並以 Python list 回傳：\n\n{text}"
     try:
         result = tokenizer_agent.run(task=prompt)
