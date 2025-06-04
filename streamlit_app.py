@@ -47,6 +47,53 @@ user_image = "https://www.w3schools.com/howto/img_avatar.png"
 
 seed = 42
 
+'''
+llm_config_tokenizer = LLMConfig(
+    api_type="openai",
+    model="gpt-4o-mini",
+    api_key=OPEN_API_KEY,
+)
+
+with llm_config_tokenizer:
+    tokenizer_agent = ConversableAgent(
+        name="tokenizer_agent",
+        system_message=(
+            "你是一個中文斷詞專家。\n"
+            "輸入：一段中文文字。請對它做斷詞，將所有詞語以 Python list 的形式回傳。\n"
+            "例如：輸入「我想玩動作遊戲」，應回傳 ['我', '想', '玩', '動作', '遊戲']。\n"
+            "請務必只輸出一個合法的 Python list，不要額外加任何解釋文字。"
+        )
+    )
+
+def tokenize_by_llm(text: str) -> list:
+    """
+    把 text 交給 LLM，要求它直接回傳 Python list 形式的 token list。
+    若失敗就回傳空列表或原始文字做 fallback。
+    """
+    prompt = f"請對以下文字做中文斷詞，並以 Python list 回傳：\n\n{text}"
+    try:
+        result = tokenizer_agent.run(task=prompt)
+        return ast.literal_eval(result.final_output.strip())
+    except Exception as e:
+        logging.error(f"LLM 斷詞失敗：{e}")
+        return []
+
+def recommend_games(prompt, df, vectorizer, tfidf_matrix, top_n=5):
+    # 1. 用 LLM 做斷詞
+    tokens = tokenize_by_llm(prompt)
+    # 2. 如果 LLM 回傳空 list，fallback 把整段當一個 token
+    if not isinstance(tokens, list) or len(tokens) == 0:
+        tokens = [prompt]
+    # 3. 用空格串起 tokens，再做向量化
+    joined = " ".join(tokens)
+    vec = vectorizer.transform([joined])
+    sims = cosine_similarity(vec, tfidf_matrix).flatten()
+    idxs = sims.argsort()[::-1][:top_n]
+    recs = df.iloc[idxs].copy()
+    recs["score"] = sims[idxs]
+    return recs
+'''
+
 def recommend_games(prompt: str, df: pd.DataFrame, vectorizer, tfidf_matrix, top_n: int = 5):
     """
     總入口：先請 LLM 拆解「喜歡」跟「不喜歡」，
